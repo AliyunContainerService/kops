@@ -106,7 +106,11 @@ func ValidateCluster(c *kops.Cluster, strict bool) *field.Error {
 	case kops.CloudProviderOpenstack:
 		requiresNetworkCIDR = false
 		requiresSubnetCIDR = false
-
+		//TODO: In the next development, ali cloud can provide Subnets support.
+	case kops.CloudProviderALI:
+		requiresSubnets = false
+		requiresSubnetCIDR = false
+		requiresNetworkCIDR = false
 	default:
 		return field.Invalid(fieldSpec.Child("CloudProvider"), c.Spec.CloudProvider, "CloudProvider not recognized")
 	}
@@ -325,6 +329,8 @@ func ValidateCluster(c *kops.Cluster, strict bool) *field.Error {
 			k8sCloudProvider = ""
 		case kops.CloudProviderOpenstack:
 			k8sCloudProvider = "openstack"
+		case kops.CloudProviderALI:
+			k8sCloudProvider = ""
 		default:
 			return field.Invalid(fieldSpec.Child("CloudProvider"), c.Spec.CloudProvider, "unknown cloudprovider")
 		}

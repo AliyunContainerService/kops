@@ -227,6 +227,8 @@
   packages = [
     "common",
     "ecs",
+    "ess",
+    "metadata",
     "oss",
     "ram",
     "slb",
@@ -1712,6 +1714,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "466d4f729f9b42c133774b443359841aa56e918db97a9adf33e609df9be4cee9"
+  inputs-digest = "754e7df2627ef3a3966cffd48c2c62f05b50dab1cab3610e28acb4b957fd2144"
   solver-name = "gps-cdcl"
   solver-version = 1

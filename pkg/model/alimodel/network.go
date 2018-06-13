@@ -50,6 +50,13 @@ func (b *NetWorkModelBuilder) Build(c *fi.ModelBuilderContext) error {
 		c.AddTask(vpc)
 	}
 
+	natGateway := &alitasks.NatGateway{
+		Name:      s(b.GetNameForNatGateway(b.GetNameForVPC())),
+		VPC:     b.LinkToVPC(),
+		Lifecycle: b.Lifecycle,
+	}
+	c.AddTask(natGateway)
+
 	for i := range b.Cluster.Spec.Subnets {
 		subnetSpec := &b.Cluster.Spec.Subnets[i]
 

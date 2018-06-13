@@ -176,6 +176,21 @@ func run() error {
 			}
 			internalIP = ip
 		}
+	} else if cloud == "alicloud" {
+		glog.Info("Initializing AliCloud volumes")
+		aliVolumes, err := protokube.NewALIVolumes()
+		if err != nil {
+			glog.Errorf("Error initializing Aliyun: %q", err)
+			os.Exit(1)
+		}
+		volumes = aliVolumes
+
+		if clusterID == "" {
+			clusterID = aliVolumes.ClusterID()
+		}
+		if internalIP == nil {
+			internalIP = aliVolumes.InternalIP()
+		}
 	} else {
 		glog.Errorf("Unknown cloud %q", cloud)
 		os.Exit(1)
@@ -232,6 +247,12 @@ func run() error {
 				return err
 			}
 			gossipName = volumes.(*protokube.GCEVolumes).InstanceName()
+		} else if cloud == "alicloud" {
+			gossipSeeds, err = volumes.(*protokube.ALIVolumes).GossipSeeds()
+			if err != nil {
+				return err
+			}
+			gossipName = volumes.(*protokube.ALIVolumes).InstanceID()
 		} else {
 			glog.Fatalf("seed provider for %q not yet implemented", cloud)
 		}

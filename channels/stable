@@ -26,6 +26,8 @@ spec:
       kubernetesVersion: ">=1.10.0"
     - providerID: gce
       name: "cos-cloud/cos-stable-64-10176-62-0"
+    - providerID: alicloud
+      name: "ubuntu_16_0402_64_20G_alibase_20171227.vhd"
   cluster:
     kubernetesVersion: v1.5.8
     networking:

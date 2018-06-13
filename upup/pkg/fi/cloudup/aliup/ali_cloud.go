@@ -25,10 +25,11 @@ import (
 
 	"github.com/denverdino/aliyungo/common"
 	"github.com/denverdino/aliyungo/ecs"
+	"github.com/denverdino/aliyungo/ess"
 	"github.com/denverdino/aliyungo/ram"
 	"github.com/denverdino/aliyungo/slb"
 
-	"k8s.io/api/core/v1"
+	//	"k8s.io/api/core/v1"
 	prj "k8s.io/kops"
 	"k8s.io/kops/dnsprovider/pkg/dnsprovider"
 	"k8s.io/kops/pkg/apis/kops"
@@ -41,12 +42,18 @@ const TagClusterName = "KubernetesCluster"
 // This is for statistic purpose.
 var KubernetesKopsIdentity = fmt.Sprintf("Kubernetes.Kops/%s", prj.Version)
 
+const TagNameRolePrefix = "k8s.io/role/"
+const TagNameEtcdClusterPrefix = "k8s.io/etcd/"
+const TagRoleMaster = "master"
+
 type ALICloud interface {
 	fi.Cloud
 
 	EcsClient() *ecs.Client
 	SlbClient() *slb.Client
 	RamClient() *ram.RamClient
+	VpcClient() *ecs.Client
+	EssClient() *ess.Client
 
 	Region() string
 	AddClusterTags(tags map[string]string)
@@ -54,12 +61,17 @@ type ALICloud interface {
 	CreateTags(resourceId string, resourceType string, tags map[string]string) error
 	RemoveTags(resourceId string, resourceType string, tags map[string]string) error
 	GetClusterTags() map[string]string
+	GetApiIngressStatus(cluster *kops.Cluster) ([]kops.ApiIngressStatus, error)
+	FindClusterStatus(cluster *kops.Cluster) (*kops.ClusterStatus, error)
+	WaitForInstanceStopped(instanceId string) error
 }
 
 type aliCloudImplementation struct {
 	ecsClient *ecs.Client
 	slbClient *slb.Client
 	ramClient *ram.RamClient
+	vpcClient *ecs.Client
+	essClient *ess.Client
 
 	region string
 	tags   map[string]string
@@ -84,9 +96,18 @@ func NewALICloud(region string, tags map[string]string) (ALICloud, error) {
 
 	c.ecsClient = ecs.NewClient(accessKeyId, accessKeySecret)
 	c.ecsClient.SetUserAgent(KubernetesKopsIdentity)
+
+	c.vpcClient = ecs.NewVPCClient(accessKeyId, accessKeySecret, common.Region(region))
+	c.vpcClient.SetUserAgent(KubernetesKopsIdentity)
+
 	c.slbClient = slb.NewClient(accessKeyId, accessKeySecret)
-	ramclient := ram.NewClient(accessKeyId, accessKeySecret)
-	c.ramClient = ramclient.(*ram.RamClient)
+	c.slbClient.SetUserAgent(KubernetesKopsIdentity)
+
+	c.essClient = ess.NewClient(accessKeyId, accessKeySecret)
+	c.essClient.SetUserAgent(KubernetesKopsIdentity)
+
+	c.ramClient = ram.NewClient(accessKeyId, accessKeySecret).(*ram.RamClient)
+	c.ramClient.SetUserAgent(KubernetesKopsIdentity)
 
 	c.tags = tags
 
@@ -97,12 +118,20 @@ func (c *aliCloudImplementation) EcsClient() *ecs.Client {
 	return c.ecsClient
 }
 
+func (c *aliCloudImplementation) VpcClient() *ecs.Client {
+	return c.vpcClient
+}
+
 func (c *aliCloudImplementation) SlbClient() *slb.Client {
 	return c.slbClient
 }
 
 func (c *aliCloudImplementation) RamClient() *ram.RamClient {
 	return c.ramClient
+}
+
+func (c *aliCloudImplementation) EssClient() *ess.Client {
+	return c.essClient
 }
 
 func (c *aliCloudImplementation) Region() string {
@@ -121,10 +150,11 @@ func (c *aliCloudImplementation) DeleteGroup(g *cloudinstances.CloudInstanceGrou
 	return errors.New("DeleteGroup not implemented on aliCloud")
 }
 
+/*
 func (c *aliCloudImplementation) DeleteInstance(i *cloudinstances.CloudInstanceGroupMember) error {
 	return errors.New("DeleteInstance not implemented on aliCloud")
 }
-
+*/
 func (c *aliCloudImplementation) FindVPCInfo(id string) (*fi.VPCInfo, error) {
 	request := &ecs.DescribeVpcsArgs{
 		RegionId: common.Region(c.Region()),
@@ -164,10 +194,11 @@ func (c *aliCloudImplementation) FindVPCInfo(id string) (*fi.VPCInfo, error) {
 
 }
 
+/*
 func (c *aliCloudImplementation) GetCloudGroups(cluster *kops.Cluster, instancegroups []*kops.InstanceGroup, warnUnmatched bool, nodes []v1.Node) (map[string]*cloudinstances.CloudInstanceGroup, error) {
 	return nil, errors.New("GetCloudGroups not implemented on aliCloud")
 }
-
+*/
 // GetTags will get the specified resource's tags.
 func (c *aliCloudImplementation) GetTags(resourceId string, resourceType string) (map[string]string, error) {
 	if resourceId == "" {
@@ -329,4 +360,30 @@ func ZoneToVSwitchID(VPCID string, zones []string, vswitchIDs []string) (map[str
 
 	}
 	return res, nil
+}
+func (c *aliCloudImplementation) GetApiIngressStatus(cluster *kops.Cluster) ([]kops.ApiIngressStatus, error) {
+	var ingresses []kops.ApiIngressStatus
+	name := "api." + cluster.Name
+
+	describeLoadBalancersArgs := &slb.DescribeLoadBalancersArgs{
+		RegionId:         common.Region(c.Region()),
+		LoadBalancerName: name,
+	}
+
+	responseLoadBalancers, err := c.SlbClient().DescribeLoadBalancers(describeLoadBalancersArgs)
+	if err != nil {
+		return nil, fmt.Errorf("error finding LoadBalancers: %v", err)
+	}
+	// Don't exist loadbalancer with specified ClusterTags or Name.
+	if len(responseLoadBalancers) == 0 {
+		return nil, nil
+	}
+	if len(responseLoadBalancers) > 1 {
+		glog.V(4).Info("The number of specified loadbalancer whith the same name exceeds 1, loadbalancerName:%q", name)
+	}
+
+	address := responseLoadBalancers[0].Address
+	ingresses = append(ingresses, kops.ApiIngressStatus{IP: address})
+
+	return ingresses, nil
 }

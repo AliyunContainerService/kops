@@ -67,6 +67,15 @@ func (b *BootstrapScript) buildEnvironmentVariables(cluster *kops.Cluster) (map[
 		env["S3_SECRET_ACCESS_KEY"] = os.Getenv("S3_SECRET_ACCESS_KEY")
 	}
 
+	if os.Getenv("ALIYUN_ACCESS_KEY_ID") != "" {
+		env["ALIYUN_ACCESS_KEY_ID"] = os.Getenv("ALIYUN_ACCESS_KEY_ID")
+		env["ALIYUN_ACCESS_KEY_SECRET"] = os.Getenv("ALIYUN_ACCESS_KEY_SECRET")
+	}
+
+	if os.Getenv("OSS_REGION") != "" {
+		env["OSS_REGION"] = os.Getenv("OSS_REGION")
+	}
+
 	if kops.CloudProviderID(cluster.Spec.CloudProvider) == kops.CloudProviderDO {
 		doToken := os.Getenv("DIGITALOCEAN_ACCESS_TOKEN")
 		if doToken != "" {

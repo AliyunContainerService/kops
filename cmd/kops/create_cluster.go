@@ -1069,6 +1069,15 @@ func RunCreateCluster(f *util.Factory, out io.Writer, c *CreateClusterOptions) e
 		cluster.Spec.SSHAccess = c.SSHAccess
 	}
 
+	if api.CloudProviderID(cluster.Spec.CloudProvider) == api.CloudProviderALI {
+		containerRegistry := "registry.cn-hangzhou.aliyuncs.com/kops"
+		fileRepository := "http://zju-zju-zju.oss-cn-qingdao.aliyuncs.com"
+		cluster.Spec.Assets = &api.Assets{
+			ContainerRegistry: &containerRegistry,
+			FileRepository:    &fileRepository,
+		}
+	}
+
 	if err := commands.SetClusterFields(c.Overrides, cluster, instanceGroups); err != nil {
 		return err
 	}

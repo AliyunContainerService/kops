@@ -144,9 +144,7 @@ func (a *AssetBuilder) RemapImage(image string) (string, error) {
 		if override != "" {
 			image = override
 		}
-	}
-
-	if a.AssetsLocation != nil && a.AssetsLocation.ContainerRegistry != nil {
+	} else if a.AssetsLocation != nil && a.AssetsLocation.ContainerRegistry != nil {
 		registryMirror := *a.AssetsLocation.ContainerRegistry
 		normalized := image
 
