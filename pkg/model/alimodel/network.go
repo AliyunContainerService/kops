@@ -61,6 +61,7 @@ func (b *NetworkModelBuilder) Build(c *fi.ModelBuilderContext) error {
 		Name:       s(b.GetNameForEIP()),
 		Lifecycle:  b.Lifecycle,
 		NatGateway: b.LinkToNatGateway(),
+		Available:  fi.Bool(false),
 	}
 	c.AddTask(eip)
 
@@ -87,7 +88,7 @@ func (b *NetworkModelBuilder) Build(c *fi.ModelBuilderContext) error {
 			Name:       s(b.GetNameForVSwitchSNAT(subnetSpec.Name)),
 			Lifecycle:  b.Lifecycle,
 			NatGateway: b.LinkToNatGateway(),
-			VSwitch:    b.LinkToVSwitch(b.GetNameForVSwitch(subnetSpec.Name)),
+			VSwitch:    b.LinkToVSwitch(subnetSpec.Name),
 		}
 
 		if subnetSpec.ProviderID != "" {

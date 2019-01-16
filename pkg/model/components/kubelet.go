@@ -195,6 +195,10 @@ func (b *KubeletOptionsBuilder) BuildOptions(o interface{}) error {
 	if cloudProvider == kops.CloudProviderOpenstack {
 		clusterSpec.Kubelet.CloudProvider = "openstack"
 	}
+	
+	if cloudProvider == kops.CloudProviderALI {
+		clusterSpec.Kubelet.CloudProvider = "alicloud"
+	}
 
 	if clusterSpec.ExternalCloudControllerManager != nil {
 		clusterSpec.Kubelet.CloudProvider = "external"

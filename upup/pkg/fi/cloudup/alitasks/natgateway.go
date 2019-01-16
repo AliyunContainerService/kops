@@ -1,3 +1,19 @@
+/*
+Copyright 2019 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package alitasks
 
 import (
@@ -69,12 +85,7 @@ func (s *NatGateway) CheckChanges(a, e, changes *NatGateway) error {
 		if e.Name == nil {
 			return fi.RequiredField("Name")
 		}
-	} else {
-		if changes.VPC.ID != nil {
-			return fi.CannotChangeField("VPC")
-		}
 	}
-
 	return nil
 }
 
@@ -88,6 +99,12 @@ func (_ *NatGateway) RenderALI(t *aliup.ALIAPITarget, a, e, changes *NatGateway)
 			RegionId: common.Region(t.Cloud.Region()),
 			VpcId:    fi.StringValue(e.VPC.ID),
 			Name:     fi.StringValue(e.Name),
+			BandwidthPackage: []ecs.BandwidthPackageType{
+				ecs.BandwidthPackageType{
+					IpCount:1,
+					Bandwidth: 20,
+				},
+			},
 		}
 
 		response, err := t.Cloud.EcsClient().CreateNatGateway(request)

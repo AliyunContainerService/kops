@@ -52,43 +52,47 @@ func (v *VSwitchSNAT) Find(c *fi.Context) (*VSwitchSNAT, error) {
 		return nil, fmt.Errorf("error listing NatGateways: %v", err)
 	}
 	if len(natGateways) == 0 {
+		glog.V(4).Infof("NatGateway not found for %s, skipping Find", fi.StringValue(v.Name))
+		return nil, nil
+	}
+	if len(natGateways[0].SnatTableIds.SnatTableId) == 0 {
 		return nil, nil
 	}
 
-	if len(natGateways[0].SnatTableIds.SnatTableId) != 1 {
-		return nil, fmt.Errorf("found multiple SnatTables for %q", natGateways[0].NatGatewayId)
-	}
+	for _, snatTableId := range natGateways[0].SnatTableIds.SnatTableId {
 
-	describeSnatTableEntriesArgs := &ecs.DescribeSnatTableEntriesArgs{
-		RegionId:    common.Region(cloud.Region()),
-		SnatTableId: natGateways[0].SnatTableIds.SnatTableId[0],
-	}
-	snatTableEntries, _, err := cloud.EcsClient().DescribeSnatTableEntries(describeSnatTableEntriesArgs)
-	if err != nil {
-		return nil, fmt.Errorf("error listing snatTableEntries: %v", err)
-	}
-	if len(snatTableEntries) == 0 {
-		return nil, nil
-	}
+		describeSnatTableEntriesArgs := &ecs.DescribeSnatTableEntriesArgs{
+			RegionId:    common.Region(cloud.Region()),
+			SnatTableId: snatTableId,
+		}
+		snatTableEntries, _, err := cloud.EcsClient().DescribeSnatTableEntries(describeSnatTableEntriesArgs)
+		if err != nil {
+			return nil, fmt.Errorf("error listing snatTableEntries: %v", err)
+		}
+		if len(snatTableEntries) == 0 {
+			continue
+		}
 
-	actual := &VSwitchSNAT{}
-	actual.VSwitch = v.VSwitch
-	actual.NatGateway = &NatGateway{ID: fi.String(natGateways[0].NatGatewayId)}
-	actual.SnatTableId = fi.String(natGateways[0].SnatTableIds.SnatTableId[0])
-	v.SnatTableId = actual.SnatTableId
+		for _, snatEntry := range snatTableEntries {
+			if snatEntry.SourceVSwitchId == fi.StringValue(v.VSwitch.VSwitchId) {
+				actual := &VSwitchSNAT{}
+				actual.ID = fi.String(snatEntry.SnatEntryId)
+				v.ID = actual.ID
+				actual.VSwitch = v.VSwitch
+				actual.NatGateway = &NatGateway{ID: v.NatGateway.ID}
+				actual.SnatTableId = fi.String(snatTableId)
+				v.SnatTableId = actual.SnatTableId
+				// Prevent spurious changes
+				actual.Shared = v.Shared
+				actual.Name = v.Name
+				actual.Lifecycle = v.Lifecycle
 
-	for _, snatEntry := range snatTableEntries {
-		if snatEntry.SourceVSwitchId == fi.StringValue(v.VSwitch.VSwitchId) {
-			actual.ID = fi.String(snatEntry.SnatEntryId)
+				return actual, nil
+			}
 		}
 	}
-
-	// Prevent spurious changes
-	actual.Shared = v.Shared
-	actual.Name = v.Name
-	actual.Lifecycle = v.Lifecycle
-
-	return actual, nil
+	v.SnatTableId = fi.String(natGateways[0].SnatTableIds.SnatTableId[0])
+	return nil, nil
 }
 
 func (v *VSwitchSNAT) Run(c *fi.Context) error {
@@ -125,14 +129,14 @@ func (_ *VSwitchSNAT) RenderALI(t *aliup.ALIAPITarget, a, e, changes *VSwitchSNA
 	if a.ID == nil {
 		createSnatEntryArgs := &ecs.CreateSnatEntryArgs{
 			RegionId:        common.Region(t.Cloud.Region()),
-			SnatTableId:     fi.StringValue(a.SnatTableId),
-			SourceVSwitchId: fi.StringValue(a.VSwitch.VSwitchId),
+			SnatTableId:     fi.StringValue(e.SnatTableId),
+			SourceVSwitchId: fi.StringValue(e.VSwitch.VSwitchId),
 		}
 		resp, err := t.Cloud.EcsClient().CreateSnatEntry(createSnatEntryArgs)
 		if err != nil {
 			return fmt.Errorf("error creating SnatEntry: %v,%v", err, createSnatEntryArgs)
 		}
-		e.SnatTableId = fi.String(resp.SnatEntryId)
+		e.ID = fi.String(resp.SnatEntryId)
 	}
 	return nil
 }

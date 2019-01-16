@@ -20,11 +20,11 @@ type EIP struct {
 	Name      *string
 	Lifecycle *fi.Lifecycle
 
-	Region       *string
-	AllocationId *string
-	IpAddress    *string
-	NatGateway   *NatGateway
-	Available    *bool
+	Region     *string
+	ID         *string
+	IpAddress  *string
+	NatGateway *NatGateway
+	Available  *bool
 }
 
 var _ fi.CompareWithID = &EIP{}
@@ -62,18 +62,19 @@ func (e *EIP) Find(c *fi.Context) (*EIP, error) {
 
 	actual := &EIP{}
 	actual.IpAddress = fi.String(eipAddresses[0].IpAddress)
-	actual.AllocationId = fi.String(eipAddresses[0].AllocationId)
+	actual.ID = fi.String(eipAddresses[0].AllocationId)
 	actual.Available = fi.Bool(eipAddresses[0].Status == ecs.EipStatusAvailable)
 	if eipAddresses[0].InstanceId != "" {
 		actual.NatGateway = &NatGateway{
 			ID: fi.String(eipAddresses[0].InstanceId),
 		}
+		actual.Region = fi.String(cloud.Region())
 	}
 	// Ignore "system" fields
 	actual.Lifecycle = e.Lifecycle
 	actual.Name = e.Name
-	actual.Region = e.Region
-	e.AllocationId = actual.AllocationId
+	e.ID = actual.ID
+	e.Available = actual.Available
 	glog.V(4).Infof("found matching EIP %v", actual)
 	return actual, nil
 }
@@ -83,11 +84,6 @@ func (e *EIP) Run(c *fi.Context) error {
 }
 
 func (_ *EIP) CheckChanges(a, e, changes *EIP) error {
-	if a == nil {
-		if e.Region == nil {
-			return fi.RequiredField("Region")
-		}
-	}
 	return nil
 }
 
@@ -105,12 +101,12 @@ func (_ *EIP) RenderALI(t *aliup.ALIAPITarget, a, e, changes *EIP) error {
 			return fmt.Errorf("error creating eip: %v", err)
 		}
 		e.IpAddress = fi.String(eipAddress)
-		e.AllocationId = fi.String(allocationId)
+		e.ID = fi.String(allocationId)
 		e.Available = fi.Bool(true)
 	}
 
-	if fi.BoolValue(a.Available) {
-		err := t.Cloud.EcsClient().AssociateEipAddress(fi.StringValue(e.AllocationId), fi.StringValue(e.NatGateway.ID))
+	if fi.BoolValue(e.Available) {
+		err := t.Cloud.EcsClient().AssociateEipAddress(fi.StringValue(e.ID), fi.StringValue(e.NatGateway.ID))
 		if err != nil {
 			return fmt.Errorf("error associating eip to natGateway: %v", err)
 		}
