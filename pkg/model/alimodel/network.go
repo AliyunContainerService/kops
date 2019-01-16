@@ -50,6 +50,20 @@ func (b *NetworkModelBuilder) Build(c *fi.ModelBuilderContext) error {
 		c.AddTask(vpc)
 	}
 
+	natGateway := &alitasks.NatGateway{
+		Name:      s(b.GetNameForNatGateway()),
+		Lifecycle: b.Lifecycle,
+		VPC:       b.LinkToVPC(),
+	}
+	c.AddTask(natGateway)
+
+	eip := &alitasks.EIP{
+		Name:       s(b.GetNameForEIP()),
+		Lifecycle:  b.Lifecycle,
+		NatGateway: b.LinkToNatGateway(),
+	}
+	c.AddTask(eip)
+
 	for i := range b.Cluster.Spec.Subnets {
 		subnetSpec := &b.Cluster.Spec.Subnets[i]
 
@@ -68,6 +82,19 @@ func (b *NetworkModelBuilder) Build(c *fi.ModelBuilderContext) error {
 		}
 
 		c.AddTask(vswitch)
+
+		vswitchSNAT := &alitasks.VSwitchSNAT{
+			Name:       s(b.GetNameForVSwitchSNAT(subnetSpec.Name)),
+			Lifecycle:  b.Lifecycle,
+			NatGateway: b.LinkToNatGateway(),
+			VSwitch:    b.LinkToVSwitch(b.GetNameForVSwitch(subnetSpec.Name)),
+		}
+
+		if subnetSpec.ProviderID != "" {
+			vswitchSNAT.Shared = fi.Bool(true)
+		}
+
+		c.AddTask(vswitchSNAT)
 
 	}
 
