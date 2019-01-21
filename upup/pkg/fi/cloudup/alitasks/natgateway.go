@@ -55,7 +55,7 @@ func (e *NatGateway) Find(c *fi.Context) (*NatGateway, error) {
 		VpcId:    fi.StringValue(e.VPC.ID),
 	}
 
-	natGateways, _, err := cloud.EcsClient().DescribeNatGateways(request)
+	natGateways, _, err := cloud.VpcClient().DescribeNatGateways(request)
 	if err != nil {
 		return nil, fmt.Errorf("error listing NatGateways: %v", err)
 	}
@@ -99,15 +99,9 @@ func (_ *NatGateway) RenderALI(t *aliup.ALIAPITarget, a, e, changes *NatGateway)
 			RegionId: common.Region(t.Cloud.Region()),
 			VpcId:    fi.StringValue(e.VPC.ID),
 			Name:     fi.StringValue(e.Name),
-			BandwidthPackage: []ecs.BandwidthPackageType{
-				ecs.BandwidthPackageType{
-					IpCount:1,
-					Bandwidth: 20,
-				},
-			},
 		}
 
-		response, err := t.Cloud.EcsClient().CreateNatGateway(request)
+		response, err := t.Cloud.VpcClient().CreateNatGateway(request)
 		if err != nil {
 			return fmt.Errorf("error creating NatGateway: %v", err)
 		}

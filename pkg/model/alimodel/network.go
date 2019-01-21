@@ -89,6 +89,7 @@ func (b *NetworkModelBuilder) Build(c *fi.ModelBuilderContext) error {
 			Lifecycle:  b.Lifecycle,
 			NatGateway: b.LinkToNatGateway(),
 			VSwitch:    b.LinkToVSwitch(subnetSpec.Name),
+			EIP:        b.LinkToEIP(),
 		}
 
 		if subnetSpec.ProviderID != "" {

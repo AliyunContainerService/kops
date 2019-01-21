@@ -46,7 +46,7 @@ func (e *EIP) Find(c *fi.Context) (*EIP, error) {
 		AssociatedInstanceId:   fi.StringValue(e.NatGateway.ID),
 	}
 
-	eipAddresses, _, err := cloud.EcsClient().DescribeEipAddresses(describeEipAddressesArgs)
+	eipAddresses, _, err := cloud.VpcClient().DescribeEipAddresses(describeEipAddressesArgs)
 	if err != nil {
 		return nil, fmt.Errorf("error finding EIPs: %v", err)
 	}
@@ -96,7 +96,7 @@ func (_ *EIP) RenderALI(t *aliup.ALIAPITarget, a, e, changes *EIP) error {
 			RegionId: common.Region(t.Cloud.Region()),
 		}
 
-		eipAddress, allocationId, err := t.Cloud.EcsClient().AllocateEipAddress(allocateEipAddressArgs)
+		eipAddress, allocationId, err := t.Cloud.VpcClient().AllocateEipAddress(allocateEipAddressArgs)
 		if err != nil {
 			return fmt.Errorf("error creating eip: %v", err)
 		}
@@ -105,8 +105,14 @@ func (_ *EIP) RenderALI(t *aliup.ALIAPITarget, a, e, changes *EIP) error {
 		e.Available = fi.Bool(true)
 	}
 
+	associateEipAddressArgs := &ecs.AssociateEipAddressArgs{
+		AllocationId: fi.StringValue(e.ID),
+		InstanceId:   fi.StringValue(e.NatGateway.ID),
+		InstanceType: ecs.Nat,
+	}
+
 	if fi.BoolValue(e.Available) {
-		err := t.Cloud.EcsClient().AssociateEipAddress(fi.StringValue(e.ID), fi.StringValue(e.NatGateway.ID))
+		err := t.Cloud.VpcClient().NewAssociateEipAddress(associateEipAddressArgs)
 		if err != nil {
 			return fmt.Errorf("error associating eip to natGateway: %v", err)
 		}

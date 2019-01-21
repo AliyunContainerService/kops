@@ -20,6 +20,7 @@ type VSwitchSNAT struct {
 
 	VSwitch     *VSwitch
 	NatGateway  *NatGateway
+	EIP         *EIP
 	SnatTableId *string
 	// Shared is set if this is a shared VSwitch
 	Shared *bool
@@ -40,6 +41,11 @@ func (v *VSwitchSNAT) Find(c *fi.Context) (*VSwitchSNAT, error) {
 		glog.V(4).Infof("NatGateway / NatGatewayId not found for %s, skipping Find", fi.StringValue(v.Name))
 		return nil, nil
 	}
+	if v.EIP == nil || v.EIP.IpAddress == nil {
+		glog.V(4).Infof("EIP / EIP not found for %s, skipping Find", fi.StringValue(v.Name))
+		return nil, nil
+	}
+
 	cloud := c.Cloud.(aliup.ALICloud)
 
 	describeNatGatewaysArgs := &ecs.DescribeNatGatewaysArgs{
@@ -47,7 +53,7 @@ func (v *VSwitchSNAT) Find(c *fi.Context) (*VSwitchSNAT, error) {
 		NatGatewayId: fi.StringValue(v.NatGateway.ID),
 	}
 
-	natGateways, _, err := cloud.EcsClient().DescribeNatGateways(describeNatGatewaysArgs)
+	natGateways, _, err := cloud.VpcClient().DescribeNatGateways(describeNatGatewaysArgs)
 	if err != nil {
 		return nil, fmt.Errorf("error listing NatGateways: %v", err)
 	}
@@ -65,7 +71,7 @@ func (v *VSwitchSNAT) Find(c *fi.Context) (*VSwitchSNAT, error) {
 			RegionId:    common.Region(cloud.Region()),
 			SnatTableId: snatTableId,
 		}
-		snatTableEntries, _, err := cloud.EcsClient().DescribeSnatTableEntries(describeSnatTableEntriesArgs)
+		snatTableEntries, _, err := cloud.VpcClient().DescribeSnatTableEntries(describeSnatTableEntriesArgs)
 		if err != nil {
 			return nil, fmt.Errorf("error listing snatTableEntries: %v", err)
 		}
@@ -123,16 +129,13 @@ func (v *VSwitchSNAT) CheckChanges(a, e, changes *VSwitchSNAT) error {
 func (_ *VSwitchSNAT) RenderALI(t *aliup.ALIAPITarget, a, e, changes *VSwitchSNAT) error {
 
 	if a == nil {
-		return fmt.Errorf("VSwitchSNAT:%q target VSwitch or target SnatGateway does not found", fi.StringValue(e.Name))
-	}
-
-	if a.ID == nil {
 		createSnatEntryArgs := &ecs.CreateSnatEntryArgs{
 			RegionId:        common.Region(t.Cloud.Region()),
 			SnatTableId:     fi.StringValue(e.SnatTableId),
 			SourceVSwitchId: fi.StringValue(e.VSwitch.VSwitchId),
+			SnatIp:          fi.StringValue(e.EIP.IpAddress),
 		}
-		resp, err := t.Cloud.EcsClient().CreateSnatEntry(createSnatEntryArgs)
+		resp, err := t.Cloud.VpcClient().CreateSnatEntry(createSnatEntryArgs)
 		if err != nil {
 			return fmt.Errorf("error creating SnatEntry: %v,%v", err, createSnatEntryArgs)
 		}

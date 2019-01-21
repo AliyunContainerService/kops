@@ -94,7 +94,7 @@ func (b *BootstrapScript) buildEnvironmentVariables(cluster *kops.Cluster) (map[
 	if kops.CloudProviderID(cluster.Spec.CloudProvider) == kops.CloudProviderALI {
 		region := os.Getenv("OSS_REGION")
 		if region != "" {
-			os.Getenv("OSS_REGION")
+			env["OSS_REGION"] = os.Getenv("OSS_REGION")
 		}
 
 		aliID := os.Getenv("ALIYUN_ACCESS_KEY_ID")
